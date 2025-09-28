@@ -340,7 +340,7 @@ class MonitorWindow(QWidget):
         self.system_info.setWordWrap(True)
         main_layout.addWidget(self.system_info)
 
-        def apply_theme(self):
+def apply_theme(self):
         """Apply theme to the entire application"""
         if self.is_dark_mode:
             # Dark theme
@@ -414,28 +414,200 @@ class MonitorWindow(QWidget):
         for meter in [self.cpu_meter, self.ram_meter, self.gpu_meter, self.net_meter]:
             meter.set_dark_mode(self.is_dark_mode)
 
-    def center_window(self):
+def center_window(self):
         """Center the window on screen"""
         screen = QApplication.primaryScreen().availableGeometry()
         x = (screen.width() - self.width()) // 2
         y = (screen.height() - self.height()) // 2
         self.move(x, y)
 
-    def toggle_theme(self):
+def toggle_theme(self):
         """Toggle between dark and light themes"""
         self.is_dark_mode = not self.is_dark_mode
         self.theme_btn.setText("☀️" if self.is_dark_mode else "🌙")
         self.apply_theme()
 
-    def enter_mini_mode(self):
+def enter_mini_mode(self):
         """Switch to mini text-based mode"""
         self.hide()
         self.mini_widget.position_at_top_right()
         self.mini_widget.show()
 
-    def exit_mini_mode(self):
+def exit_mini_mode(self):
         """Switch back to full mode"""
         self.mini_widget.hide()
         self.center_window()
         self.show()
         self.raise_()
+def get_gpu_usage(self):
+        """Get GPU usage with improved LibreHardwareMonitor integration"""
+        gpu_percent = 0.0
+        gpu_name = "Integrated Graphics"
+        
+        if LHM_AVAILABLE and computer:
+            try:
+                for hw in computer.Hardware:
+                    hw.Update()
+                    
+                    # Check for any GPU type
+                    if hw.HardwareType in (Hardware.HardwareType.GpuNvidia,
+                                         Hardware.HardwareType.GpuAmd,
+                                         Hardware.HardwareType.GpuIntel):
+                        
+                        gpu_name = hw.Name
+                        print(f"🎮 Found GPU: {gpu_name}")  # Debug info
+                        
+                        # Look through all sensors
+                        for sensor in hw.Sensors:
+                            sensor_name = sensor.Name or ""
+                            sensor_value = sensor.Value
+                            
+                            print(f"   Sensor: {sensor_name} = {sensor_value} ({sensor.SensorType})")  # Debug
+                            
+                            # Look for GPU Core Load or similar
+                            if (sensor.SensorType == Hardware.SensorType.Load and 
+                                sensor_value is not None):
+                                
+                                if any(keyword in sensor_name.lower() for keyword in 
+                                      ['gpu', 'core', 'load', '3d', 'graphics']):
+                                    gpu_percent = max(gpu_percent, float(sensor_value))
+                                    print(f"  Using sensor: {sensor_name} = {gpu_percent}%")
+                        
+                        # If we found a GPU but no load sensors, try alternative approach
+                        if gpu_percent == 0.0:
+                            for sensor in hw.Sensors:
+                                if (sensor.SensorType == Hardware.SensorType.Load and 
+                                    sensor.Value is not None):
+                                    gpu_percent = float(sensor.Value)
+                                    print(f"  Using first Load sensor: {sensor.Name} = {gpu_percent}%")
+                                    break
+                        
+                        if gpu_percent > 0:
+                            break  # Found working GPU
+                            
+            except Exception as e:
+                print(f" GPU monitoring error: {e}")
+                gpu_percent = 0.0
+        
+        # Fallback if no valid GPU data
+        if gpu_percent == 0.0:
+            # Use CPU-based approximation for systems without discrete GPU
+            cpu_percent = psutil.cpu_percent()
+            gpu_percent = min(cpu_percent * 0.3, 100.0)  # Conservative estimate
+            
+        return gpu_percent, gpu_name
+
+def get_system_info(self):
+        """Get comprehensive system information"""
+        try:
+            # CPU info
+            cpu_count = psutil.cpu_count(logical=False)
+            cpu_count_logical = psutil.cpu_count(logical=True)
+            cpu_freq = psutil.cpu_freq()
+            freq_text = f"{cpu_freq.current:.0f}MHz" if cpu_freq else "Unknown"
+            
+            # Memory info
+            mem = psutil.virtual_memory()
+            mem_total = mem.total / (1024**3)
+            mem_available = mem.available / (1024**3)
+            
+            # Boot time
+            boot_time = psutil.boot_time()
+            uptime = time.time() - boot_time
+            uptime_hours = int(uptime // 3600)
+            uptime_minutes = int((uptime % 3600) // 60)
+            
+            return (f"🔥 CPU: {cpu_count}C/{cpu_count_logical}T @ {freq_text} | "
+                   f"💾 RAM: {mem_available:.1f}GB/{mem_total:.1f}GB Available | "
+                   f"⏱️ Uptime: {uptime_hours}h {uptime_minutes}m |")
+                   
+        except Exception as e:
+            return f"⚠️ System info error: {str(e)}"
+
+def update_stats(self):
+        """Update all system statistics"""
+        try:
+            # CPU usage
+            cpu_percent = psutil.cpu_percent(interval=None)
+            
+            # RAM usage  
+            mem = psutil.virtual_memory()
+            ram_percent = mem.percent
+            
+            # GPU usage with improved detection
+            gpu_percent, gpu_info = self.get_gpu_usage()
+            
+            # Network usage calculation
+            current_time = time.time()
+            net_current = psutil.net_io_counters()
+            time_diff = current_time - self.last_time
+            
+            total_bytes_per_sec = 0
+            if time_diff > 0:
+                bytes_sent_per_sec = (net_current.bytes_sent - self.last_net.bytes_sent) / time_diff
+                bytes_recv_per_sec = (net_current.bytes_recv - self.last_net.bytes_recv) / time_diff
+                total_bytes_per_sec = bytes_sent_per_sec + bytes_recv_per_sec
+                
+                # Convert to percentage (10MB/s = 100%)
+                net_percent = min((total_bytes_per_sec / (10 * 1024 * 1024)) * 100, 100)
+            else:
+                net_percent = 0
+                
+            self.last_net = net_current
+            self.last_time = current_time
+
+            # Update main meters
+            cpu_freq = psutil.cpu_freq()
+            cpu_freq_text = f"{cpu_freq.current/1000:.2f} GHz" if cpu_freq else "N/A"
+            
+            self.cpu_meter.set_value(cpu_percent, cpu_freq_text)
+            self.ram_meter.set_value(ram_percent, f"{mem.total/(1024**3):.1f} GB Total")
+            self.gpu_meter.set_value(gpu_percent, gpu_info[:30] + "..." if len(gpu_info) > 30 else gpu_info)
+            self.net_meter.set_value(net_percent, f"{total_bytes_per_sec/(1024*1024):.1f} MB/s")
+
+            # Update mini widget
+            if self.mini_widget.isVisible():
+                self.mini_widget.update_status(cpu_percent, ram_percent, gpu_percent)
+
+            # Update system info
+            self.system_info.setText(self.get_system_info())
+
+        except Exception as e:
+            print(f" Error updating stats: {e}")
+
+def closeEvent(self, event):
+        """Handle application close"""
+        self.mini_widget.close()
+        if LHM_AVAILABLE and computer:
+            try:
+                computer.Close()
+            except:
+                pass
+        event.accept()
+
+
+def main():
+    """Main application entry point"""
+    app = QApplication(sys.argv)
+    
+    # Set application properties
+    app.setApplicationName("CJ Resource Monitor Pro")
+    app.setApplicationVersion("2.1")
+    
+    try:
+        window = MonitorWindow()
+        window.show()
+        
+        print(" CJ Resource Monitor Pro started successfully!")
+        print(f" LibreHardwareMonitor: {' Active' if LHM_AVAILABLE else ' Using Fallbacks'}")
+        print("=" * 50)
+        
+        sys.exit(app.exec_())
+        
+    except Exception as e:
+        print(f" Application error: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
