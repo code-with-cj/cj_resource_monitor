@@ -39,3 +39,132 @@ if LIBRE_DLL:
         LHM_AVAILABLE = False
 else:
     print(" LibreHardwareMonitorLib.dll not found in ./libs/ — GPU sensors will use fallbacks.")
+
+# If LHM available, prepare Computer object
+computer = None
+if LHM_AVAILABLE:
+    try:
+        computer = Hardware.Computer()
+        computer.IsCpuEnabled = True
+        computer.IsMemoryEnabled = True
+        computer.IsGpuEnabled = True
+        computer.IsMotherboardEnabled = True
+        computer.IsStorageEnabled = True
+        computer.Open()
+        print(" LibreHardwareMonitor Computer initialized successfully")
+    except Exception as e:
+        print(f" Error initializing LHM Computer: {e}")
+        computer = None
+        LHM_AVAILABLE = False
+
+
+# CircularMeter widget with improved text rendering
+
+class CircularMeter(QWidget):
+    def __init__(self, label: str, diameter=160, parent=None):
+        super().__init__(parent)
+        self.label = label
+        self.value = 0.0  # 0..100
+        self.info = ""
+        self.diameter = diameter
+        self.is_dark_mode = True
+        
+        # Set fixed size with padding for info text
+        self.setFixedSize(diameter + 20, diameter + 60)  
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        
+        # Fonts
+        self._font_value = QFont("Segoe UI", 18, QFont.Bold)
+        self._font_label = QFont("Segoe UI", 11, QFont.Bold)
+        self._font_info = QFont("Segoe UI", 9)
+
+    def set_dark_mode(self, is_dark):
+        self.is_dark_mode = is_dark
+        self.update()
+
+    def set_value(self, percent: float, info: str = ""):
+        self.value = max(0.0, min(100.0, float(percent)))
+        self.info = info
+        self.update()
+
+    def get_color_for_value(self, percent):
+        """Get color based on percentage value"""
+        if percent <= 20:
+            return QColor("#00ff88")  # Green
+        elif percent <= 40:
+            return QColor("#00d4ff")  # Cyan
+        elif percent <= 60:
+            return QColor("#ffd700")  # Yellow
+        elif percent <= 80:
+            return QColor("#ff8c00")  # Orange
+        else:
+            return QColor("#ff4757")  # Red
+
+    def get_text_color(self):
+        """Get appropriate text color based on theme"""
+        return QColor("white") if self.is_dark_mode else QColor("#333333")
+
+    def get_secondary_text_color(self):
+        """Get secondary text color based on theme"""
+        return QColor("#cccccc") if self.is_dark_mode else QColor("#666666")
+
+    def get_track_color(self):
+        """Get track color based on theme"""
+        return QColor("#404040") if self.is_dark_mode else QColor("#e0e0e0")
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        # Calculate dimensions
+        widget_rect = self.rect()
+        center_x = widget_rect.width() // 2
+        center_y = self.diameter // 2 + 10  
+        radius = (self.diameter - 24) // 2 
+        
+        # Ensure valid dimensions
+        if radius <= 0:
+            return
+
+        # Calculate drawing rectangle
+        draw_x = int(center_x - radius)
+        draw_y = int(center_y - radius)
+        draw_size = int(radius * 2)
+        
+        # Background circle (track)
+        pen = QPen(self.get_track_color(), 6, Qt.SolidLine, Qt.RoundCap)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+        painter.drawEllipse(draw_x, draw_y, draw_size, draw_size)
+
+        # Progress arc
+        if self.value > 0:
+            start_angle = 90 * 16  # Start from top
+            span_angle = int(-(360 * self.value / 100) * 16)  
+            
+            arc_color = self.get_color_for_value(self.value)
+            pen = QPen(arc_color, 6, Qt.SolidLine, Qt.RoundCap)
+            painter.setPen(pen)
+            painter.setBrush(Qt.NoBrush)
+            painter.drawArc(draw_x, draw_y, draw_size, draw_size, start_angle, span_angle)
+
+        # Center percentage text
+        painter.setPen(self.get_text_color())
+        painter.setFont(self._font_value)
+        text_rect = QRect(draw_x, int(center_y - 12), draw_size, 24)
+        painter.drawText(text_rect, Qt.AlignCenter, f"{int(self.value)}%")
+
+        # Label below circle with proper spacing
+        painter.setFont(self._font_label)
+        painter.setPen(self.get_text_color())
+        label_y = center_y + radius + 15  
+        label_rect = QRect(0, int(label_y), widget_rect.width(), 20)
+        painter.drawText(label_rect, Qt.AlignCenter, self.label)
+
+        # Info text below label with more spacing
+        if self.info:
+            painter.setFont(self._font_info)
+            painter.setPen(self.get_secondary_text_color())
+            info_y = label_y + 25  
+            info_rect = QRect(0, int(info_y), widget_rect.width(), 16)
+            painter.drawText(info_rect, Qt.AlignCenter, self.info)
