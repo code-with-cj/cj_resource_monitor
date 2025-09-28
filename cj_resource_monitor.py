@@ -168,3 +168,65 @@ class CircularMeter(QWidget):
             info_y = label_y + 25  
             info_rect = QRect(0, int(info_y), widget_rect.width(), 16)
             painter.drawText(info_rect, Qt.AlignCenter, self.info)
+
+# Mini Status Widget (Text-based)
+
+class MiniStatusWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint | Qt.Tool)
+        self.setFixedSize(300, 36)  
+        
+        # Dark background with no border
+        self.setStyleSheet("""
+            background-color: #1a1c1e; 
+            color: white; 
+            border: none; 
+            border-radius: 8px;
+            padding: 8px;
+        """)
+        
+        # Layout
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(10, 4, 10, 4) 
+        layout.setSpacing(0)
+        
+        # Status label with bold font
+        self.status_label = QLabel("CPU 0% | RAM 0% | GPU 0%")
+        self.status_label.setFont(QFont("Segoe UI", 9, QFont.Bold))  
+        self.status_label.setStyleSheet("color: white; background: transparent;")
+        
+        # Restore button
+        self.restore_btn = QPushButton("⬆")
+        self.restore_btn.setFixedSize(30, 30)  # Smaller button
+        self.restore_btn.setFont(QFont("Segoe UI", 10, QFont.Bold))  
+        self.restore_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #333333;
+                color: white;
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #444444;
+            }
+            QPushButton:pressed {
+                background-color: #222222;
+            }
+        """)
+        
+        layout.addWidget(self.status_label)
+        layout.addStretch()
+        layout.addWidget(self.restore_btn)
+
+    def update_status(self, cpu_percent, ram_percent, gpu_percent):
+        """Update the status text"""
+        status_text = f"CPU {int(cpu_percent)}% | RAM {int(ram_percent)}% | GPU {int(gpu_percent)}%"
+        self.status_label.setText(status_text)
+
+    def position_at_top_right(self):
+        """Position widget at top-right of screen"""
+        screen = QApplication.primaryScreen().availableGeometry()
+        x = screen.width() - self.width() - 20
+        y = 20
+        self.move(x, y)
