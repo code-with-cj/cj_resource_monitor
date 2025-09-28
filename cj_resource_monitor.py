@@ -339,3 +339,103 @@ class MonitorWindow(QWidget):
         self.system_info.setAlignment(Qt.AlignCenter)
         self.system_info.setWordWrap(True)
         main_layout.addWidget(self.system_info)
+
+        def apply_theme(self):
+        """Apply theme to the entire application"""
+        if self.is_dark_mode:
+            # Dark theme
+            self.setStyleSheet("""
+                QWidget {
+                    background-color: #1a1c1e;
+                    color: white;
+                }
+                QPushButton {
+                    background-color: #2d3142;
+                    border: 2px solid #4f5b66;
+                    border-radius: 12px;
+                    color: white;
+                }
+                QPushButton:hover {
+                    background-color: #3d4152;
+                    border-color: #6f7b86;
+                }
+                QPushButton:pressed {
+                    background-color: #1d2132;
+                }
+                QLabel {
+                    color: white;
+                }
+            """)
+            
+            self.title_label.setStyleSheet("color: #0066cc; font-weight: bold;")
+            self.system_info.setStyleSheet("""
+                color: #cccccc; 
+                padding: 15px; 
+                background-color: rgba(255,255,255,0.05); 
+                border-radius: 10px;
+                border: 1px solid #333333;
+            """)
+            
+        else:
+            # Light theme
+            self.setStyleSheet("""
+                QWidget {
+                    background-color: #f8f9fa;
+                    color: #333333;
+                }
+                QPushButton {
+                    background-color: #e9ecef;
+                    border: 2px solid #ced4da;
+                    border-radius: 12px;
+                    color: #333333;
+                }
+                QPushButton:hover {
+                    background-color: #dee2e6;
+                    border-color: #adb5bd;
+                }
+                QPushButton:pressed {
+                    background-color: #ced4da;
+                }
+                QLabel {
+                    color: #333333;
+                }
+            """)
+            
+            self.title_label.setStyleSheet("color: #0066cc; font-weight: bold;")
+            self.system_info.setStyleSheet("""
+                color: #495057; 
+                padding: 15px; 
+                background-color: rgba(0,0,0,0.05); 
+                border-radius: 10px;
+                border: 1px solid #dee2e6;
+            """)
+        
+        # Update meters theme
+        for meter in [self.cpu_meter, self.ram_meter, self.gpu_meter, self.net_meter]:
+            meter.set_dark_mode(self.is_dark_mode)
+
+    def center_window(self):
+        """Center the window on screen"""
+        screen = QApplication.primaryScreen().availableGeometry()
+        x = (screen.width() - self.width()) // 2
+        y = (screen.height() - self.height()) // 2
+        self.move(x, y)
+
+    def toggle_theme(self):
+        """Toggle between dark and light themes"""
+        self.is_dark_mode = not self.is_dark_mode
+        self.theme_btn.setText("☀️" if self.is_dark_mode else "🌙")
+        self.apply_theme()
+
+    def enter_mini_mode(self):
+        """Switch to mini text-based mode"""
+        self.hide()
+        self.mini_widget.position_at_top_right()
+        self.mini_widget.show()
+
+    def exit_mini_mode(self):
+        """Switch back to full mode"""
+        self.mini_widget.hide()
+        self.center_window()
+        self.show()
+        self.raise_()
