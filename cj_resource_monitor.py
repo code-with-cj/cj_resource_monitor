@@ -230,3 +230,112 @@ class MiniStatusWidget(QWidget):
         x = screen.width() - self.width() - 20
         y = 20
         self.move(x, y)
+
+# Main Window
+
+class MonitorWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle(" CJ Resource Monitor Pro | CODE with CJ")
+        
+        # Window dimensions
+        self.full_w = 980
+        self.full_h = 580
+        
+        self.resize(self.full_w, self.full_h)
+        self.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.WindowCloseButtonHint | Qt.WindowMinimizeButtonHint)
+        
+        # Theme state
+        self.is_dark_mode = True
+        
+        # Setup UI
+        self.setup_ui()
+        self.apply_theme()
+        
+        # Setup mini widget
+        self.mini_widget = MiniStatusWidget()
+        self.mini_widget.restore_btn.clicked.connect(self.exit_mini_mode)
+        
+        # Timer for stats updates
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_stats)
+        self.timer.start(1000)
+        
+        # Network monitoring
+        self.last_net = psutil.net_io_counters()
+        self.last_time = time.time()
+        
+        # Center window
+        self.center_window()
+
+    def setup_ui(self):
+        """Setup the user interface"""
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(20)
+
+        # Header
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Left spacer (invisible placeholder to balance the right buttons)
+        left_spacer = QWidget()
+        left_spacer.setFixedSize(110, 45)  # Same total width as right buttons + spacing
+        
+        # Title (centered)
+        self.title_label = QLabel("⚡ CJ RESOURCE MONITOR ⚡")
+        self.title_label.setFont(QFont("Segoe UI", 20, QFont.Bold))
+        self.title_label.setAlignment(Qt.AlignCenter)
+        
+        # Control buttons
+        controls_layout = QHBoxLayout()
+        controls_layout.setSpacing(10)
+        controls_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Theme toggle button
+        self.theme_btn = QPushButton("🌙")
+        self.theme_btn.setFixedSize(45, 45)
+        self.theme_btn.setFont(QFont("Segoe UI", 18))
+        self.theme_btn.setToolTip("Toggle Theme")
+        self.theme_btn.clicked.connect(self.toggle_theme)
+        
+        # Mini mode button
+        self.mini_btn = QPushButton("─")
+        self.mini_btn.setFixedSize(45, 45)
+        self.mini_btn.setFont(QFont("Segoe UI", 20, QFont.Bold))
+        self.mini_btn.setToolTip("Minimize to Status Bar")
+        self.mini_btn.clicked.connect(self.enter_mini_mode)
+        
+        controls_layout.addWidget(self.theme_btn)
+        controls_layout.addWidget(self.mini_btn)
+        
+        # Add widgets to header with equal spacing
+        header_layout.addWidget(left_spacer)  # Left balance
+        header_layout.addWidget(self.title_label, 1)  # Center with stretch
+        header_layout.addLayout(controls_layout)  # Right buttons
+        
+        main_layout.addLayout(header_layout)
+
+        # Meters section
+        meters_layout = QHBoxLayout()
+        meters_layout.setSpacing(30)  # More spacing between meters
+        
+        # Create meters
+        self.cpu_meter = CircularMeter("CPU Usage", diameter=160)
+        self.ram_meter = CircularMeter("RAM Usage", diameter=160)
+        self.gpu_meter = CircularMeter("GPU Usage", diameter=160)
+        self.net_meter = CircularMeter("Network", diameter=160)
+        
+        meters_layout.addWidget(self.cpu_meter, alignment=Qt.AlignCenter)
+        meters_layout.addWidget(self.ram_meter, alignment=Qt.AlignCenter)
+        meters_layout.addWidget(self.gpu_meter, alignment=Qt.AlignCenter)
+        meters_layout.addWidget(self.net_meter, alignment=Qt.AlignCenter)
+        
+        main_layout.addLayout(meters_layout)
+
+        # System info section
+        self.system_info = QLabel(" System Information Loading...")
+        self.system_info.setFont(QFont("Segoe UI", 10))
+        self.system_info.setAlignment(Qt.AlignCenter)
+        self.system_info.setWordWrap(True)
+        main_layout.addWidget(self.system_info)
